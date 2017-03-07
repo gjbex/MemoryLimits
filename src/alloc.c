@@ -11,7 +11,7 @@
 void fill(char *c, long size);
 
 int main(int argc, char *argv[]) {
-    long mem, maxMem, incr, interval = 0L;
+    long mem;
     Params params;
     initCL(&params);
     parseCL(&params, &argc, &argv);
