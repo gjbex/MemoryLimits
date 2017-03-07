@@ -1,11 +1,14 @@
 #include <algorithm>
+#include <chrono>
 #include <iostream>
 #include <sstream>
+#include <thread>
 #include <string.h>
 #include <unistd.h>
 #include <mpi.h>
 
 size_t convert_size(char *size_spec);
+long convert_time(char *time_spec);
 
 int main(int argc, char *argv[]) {
     const int root {0};
@@ -14,7 +17,7 @@ int main(int argc, char *argv[]) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     char *conf_file_name {nullptr};
-    unsigned sleeptime {0};
+    long sleeptime {0};
     size_t increment {0};
     size_t max_size {0};
     int is_verbose {0};
@@ -34,7 +37,7 @@ int main(int argc, char *argv[]) {
                     increment = convert_size(optarg);
                     break;
                 case 's':
-                    sleeptime = std::stoi(optarg);
+                    sleeptime = convert_time(optarg);
                     break;
                 case 'v':
                     is_verbose = 1;
@@ -65,7 +68,7 @@ int main(int argc, char *argv[]) {
     } else {
         MPI_Bcast(&max_size, 1, MPI_UNSIGNED_LONG, root, MPI_COMM_WORLD);
         MPI_Bcast(&increment, 1, MPI_UNSIGNED_LONG, root, MPI_COMM_WORLD);
-        MPI_Bcast(&sleeptime, 1, MPI_INT, root, MPI_COMM_WORLD);
+        MPI_Bcast(&sleeptime, 1, MPI_LONG, root, MPI_COMM_WORLD);
         if (is_verbose) {
             std::stringstream msg;
             msg << "rank: " << rank << ": "
@@ -95,6 +98,28 @@ size_t convert_size(char *size_spec) {
         } else if (unit == "gb") {
             number *= 1024*1024*1024;
         } else if (unit != "b") {
+            throw std::invalid_argument("unknown unit");
+        }
+    }
+    return number;
+}
+
+long convert_time(char *time_spec) {
+    std::stringstream stream;
+    stream.str(time_spec);
+    long number {0};
+    stream >> number;
+    std::string unit;
+    stream >> unit;
+    if (unit != "") {
+        std::transform(unit.begin(), unit.end(), unit.begin(), ::tolower);
+        if (unit == "s") {
+            number *= 1000000;
+        } else if (unit == "ms") {
+            number *= 1000;
+        } else if (unit == "m") {
+            number *= 60*1000000;
+        } else if (unit != "us") {
             throw std::invalid_argument("unknown unit");
         }
     }
