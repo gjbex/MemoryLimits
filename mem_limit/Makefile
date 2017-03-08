@@ -1,0 +1,13 @@
+CXX = mpic++
+CXXFLAGS = -O0 -g -Wall -std=c++14 -fopenmp
+
+all: mem_limit
+
+mem_limit: mem_limit.o
+	$(CXX) $(CXXFLAGS) -o $@ $^
+
+%.o: %.cc
+	$(CXX) $(CXXFLAGS) -c -o $@ $^
+
+clean:
+	rm -f *.o core.* mem_limit
