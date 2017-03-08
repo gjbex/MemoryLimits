@@ -3,6 +3,7 @@
 #include <iostream>
 #include <sstream>
 #include <thread>
+#include <vector>
 #include <string.h>
 #include <unistd.h>
 #include <mpi.h>
@@ -202,4 +203,16 @@ void fill_memory(char *buffer, size_t size) {
         buffer[i] = fill;
         fill = fill == 'Z' ? 'A' : fill + 1;
     }
+}
+
+std::vector<std::string> split(const std::string& str,
+                               const std::string& delim) {
+    std::vector<std::string> parts;
+    size_t pos = 0, old_pos = 0;
+    while ((pos = str.find(delim, old_pos)) != std::string::npos) {
+        parts.push_back(str.substr(old_pos, pos - old_pos));
+        old_pos = pos + delim.length();
+    }
+    parts.push_back(str.substr(old_pos));
+    return parts;
 }
