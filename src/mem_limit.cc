@@ -14,6 +14,7 @@
 // exit codes for application
 const int EXIT_OPT_ERROR {1};
 const int EXIT_CONFIG_ERROR {2};
+const int EXIT_MEM_ERROR {3};
 
 size_t convert_size(const char *size_spec);
 long convert_time(const char *time_spec);
@@ -67,6 +68,7 @@ int main(int argc, char *argv[]) {
                         break;
                     case 'l':
                         lifetime = convert_time(optarg);
+                        break;
                     case 'v':
                         is_verbose = 1;
                         break;
@@ -160,25 +162,38 @@ int main(int argc, char *argv[]) {
 #pragma omp parallel
     {
         int thread_nr = omp_get_thread_num();
-        for (size_t mem = increments[thread_nr];
-                mem <= max_sizes[thread_nr]; mem += increments[thread_nr]) {
+        size_t increment = increments[thread_nr] > 0 ?
+            increments[thread_nr] : max_sizes[thread_nr];
+        for (size_t mem = increment; mem <= max_sizes[thread_nr];
+                mem += increment) {
             std::stringstream msg;
             msg << "rank " << rank << "#" << thread_nr << ": "
                 << "allcocating " << mem << " bytes" << std::endl;
             std::cout << msg.str();
-            char *buffer = allocate_memory(mem);
-            msg.str("");
-            msg << "rank " << rank << "#" << thread_nr << ": "
-                << "filling " << mem << " bytes" << std::endl;
-            std::cout << msg.str();
-            fill_memory(buffer, mem);
-            std::chrono::microseconds period(sleeptimes[thread_nr]);
-            std::this_thread::sleep_for(period);
-            delete[] buffer;
+            try {
+                char *buffer = allocate_memory(mem);
+                msg.str("");
+                msg << "rank " << rank << "#" << thread_nr << ": "
+                    << "filling " << mem << " bytes" << std::endl;
+                std::cout << msg.str();
+                fill_memory(buffer, mem);
+                std::chrono::microseconds period(sleeptimes[thread_nr]);
+                std::this_thread::sleep_for(period);
+                delete[] buffer;
+            } catch (const std::runtime_error& e) {
+                std::stringstream msg;
+                msg << "# error: allocation of " << mem << " bytes failed"
+                    << std::endl;
+                std::cerr << msg.str();
+                MPI_Abort(MPI_COMM_WORLD, EXIT_MEM_ERROR);
+            }
         }
     }
     std::chrono::microseconds period(lifetime);
     std::this_thread::sleep_for(period);
+    delete[] max_sizes;
+    delete[] increments;
+    delete[] sleeptimes;
     MPI_Barrier(MPI_COMM_WORLD);
     if (rank == root) {
         std::stringstream msg;
@@ -234,9 +249,9 @@ long convert_time(const char *time_spec) {
 }
 
 char* allocate_memory(size_t size) {
-    char* buffer = new char[size];
-    if (buffer == nullptr)
-        throw std::runtime_error("can not allocate mmemory");
+    char* buffer {NULL};
+    if ((buffer = (char*) malloc(size*sizeof(char))) == NULL)
+        throw std::runtime_error("can allocate memory");
     return buffer;
 }
 
