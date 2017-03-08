@@ -1,7 +1,7 @@
 CC = gcc
 CFLAGS = -O0 -g -Wall
 CXX = mpic++
-CXXFLAGS = -O0 -g -Wall -std=c++14
+CXXFLAGS = -O0 -g -Wall -std=c++14 -fopenmp
 GENCL = weave
 
 OBJS = cl_params_aux.o cl_params.o alloc.o
