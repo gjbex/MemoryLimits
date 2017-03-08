@@ -1,6 +1,8 @@
 #include <algorithm>
 #include <chrono>
+#include <fstream>
 #include <iostream>
+#include <regex>
 #include <sstream>
 #include <thread>
 #include <vector>
@@ -9,10 +11,17 @@
 #include <mpi.h>
 #include <omp.h>
 
-size_t convert_size(char *size_spec);
-long convert_time(char *time_spec);
+// exit codes for application
+const int EXIT_OPT_ERROR {1};
+const int EXIT_CONFIG_ERROR {2};
+
+size_t convert_size(const char *size_spec);
+long convert_time(const char *time_spec);
 char* allocate_memory(size_t size);
 void fill_memory(char *buffer, size_t size);
+void parse_config(const std::string& file_name, int target_line_nr,
+                  int& nr_threads, size_t** max_sizes, size_t** increments,
+                  long** sleeptimes);
 
 int main(int argc, char *argv[]) {
     const int root {0};
@@ -33,37 +42,61 @@ int main(int argc, char *argv[]) {
     int is_verbose {0};
     int name_length {0};
     if (rank == root) {
+        bool opt_sufficient {false};
         char opt {'\0'};
         while ((opt = getopt(argc, argv, "f:t:m:i:s:l:vh")) != -1) {
-            switch (opt) {
-                case 'f':
-                    conf_file_name = optarg;
-                    name_length = strlen(conf_file_name);
-                    break;
-                case 't':
-                    nr_threads = atoi(optarg);
-                    break;
-                case 'm':
-                    max_size = convert_size(optarg);
-                    break;
-                case 'i':
-                    increment = convert_size(optarg);
-                    break;
-                case 's':
-                    sleeptime = convert_time(optarg);
-                    break;
-                case 'l':
-                    lifetime = convert_time(optarg);
-                case 'v':
-                    is_verbose = 1;
-                    break;
-                case 'h':
-                    // TODO
-                    break;
-                default:
-                    // TODO
-                    break;
+            try {
+                switch (opt) {
+                    case 'f':
+                        conf_file_name = optarg;
+                        name_length = strlen(conf_file_name);
+                        opt_sufficient = true;
+                        break;
+                    case 't':
+                        nr_threads = atoi(optarg);
+                        break;
+                    case 'm':
+                        max_size = convert_size(optarg);
+                        opt_sufficient = true;
+                        break;
+                    case 'i':
+                        increment = convert_size(optarg);
+                        break;
+                    case 's':
+                        sleeptime = convert_time(optarg);
+                        break;
+                    case 'l':
+                        lifetime = convert_time(optarg);
+                    case 'v':
+                        is_verbose = 1;
+                        break;
+                    case 'h':
+                        // TODO: implement print_help
+                        break;
+                    default:
+                        std::stringstream msg;
+                        msg << "# error: unknown option '-" << opt << "'"
+                            << std::endl;
+                        std::cerr << msg.str();
+                        // TODO: call print_help
+                        MPI_Abort(MPI_COMM_WORLD, EXIT_OPT_ERROR);
+                }
+            } catch (const std::invalid_argument& e) {
+                    std::stringstream msg;
+                    msg << "# error: invalid option value, " << e.what()
+                        << std::endl;
+                    std::cerr << msg.str();
+                    // TODO: call print_help
+                    MPI_Abort(MPI_COMM_WORLD, EXIT_OPT_ERROR);
             }
+        }
+        if (!opt_sufficient) {
+            std::stringstream msg;
+            msg << "# error: expecting at least -f or -m option"
+                << std::endl;
+            std::cerr << msg.str();
+            // TODO: call print_help
+            MPI_Abort(MPI_COMM_WORLD, EXIT_OPT_ERROR);
         }
     }
     MPI_Bcast(&is_verbose, 1, MPI_INT, root, MPI_COMM_WORLD);
@@ -79,6 +112,16 @@ int main(int argc, char *argv[]) {
             msg << "rank " << rank << ": "
                 << "'" << conf_file_name << "'" << std::endl;
             std::cerr << msg.str();
+        }
+        try {
+            parse_config(conf_file_name, rank, nr_threads, &max_sizes,
+                         &increments, &sleeptimes);
+        } catch (const std::exception& e) {
+            std::stringstream msg;
+            msg << "# error: invalid configuration file, " << e.what()
+                << std::endl;
+            std::cerr << msg.str();
+            MPI_Abort(MPI_COMM_WORLD, EXIT_CONFIG_ERROR);
         }
     } else {
         MPI_Bcast(&nr_threads, 1, MPI_INT, root, MPI_COMM_WORLD);
@@ -146,7 +189,7 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
-size_t convert_size(char *size_spec) {
+size_t convert_size(const char *size_spec) {
     std::stringstream stream;
     stream.str(size_spec);
     size_t number {0};
@@ -168,7 +211,7 @@ size_t convert_size(char *size_spec) {
     return number;
 }
 
-long convert_time(char *time_spec) {
+long convert_time(const char *time_spec) {
     std::stringstream stream;
     stream.str(time_spec);
     long number {0};
@@ -215,4 +258,50 @@ std::vector<std::string> split(const std::string& str,
     }
     parts.push_back(str.substr(old_pos));
     return parts;
+}
+
+void parse_config(const std::string& file_name, int target_line_nr,
+                  int& nr_threads, size_t** max_sizes, size_t** increments,
+                  long** sleeptimes) {
+    std::regex comment_re {R"(^\s*#)"};
+    std::regex empty_re {R"(^\s*$)"};
+    std::ifstream config_file;
+    config_file.open(file_name);
+    int line_nr {0};
+    std::string line;
+    while (config_file) {
+        std::string curr_line;
+        std::getline(config_file, curr_line);
+        std::smatch match;
+        if (std::regex_search(curr_line, match, empty_re))
+            continue;
+        if (std::regex_search(curr_line, match, comment_re))
+            continue;
+        line = curr_line;
+        if (line_nr++ == target_line_nr)
+            break;
+    }
+    config_file.close();
+    if (line.length() > 0) {
+        std::vector<std::string> parts = split(line, ";");
+        nr_threads = std::stoi(parts.at(0));
+        *max_sizes = new size_t[nr_threads];
+        *increments = new size_t[nr_threads];
+        *sleeptimes = new long[nr_threads];
+        parts = split(parts.at(1), ":");
+        size_t i {0};
+        for (i = 0; i < parts.size() && ((int) i) < nr_threads; i++) {
+            std::vector<std::string> specs = split(parts.at(i), "+");
+            (*max_sizes)[i] = convert_size(specs.at(0).c_str());
+            (*increments)[i] = convert_size(specs.at(1).c_str());
+            (*sleeptimes)[i] = convert_time(specs.at(2).c_str());
+        }
+        for (int j = i; j < nr_threads; j++) {
+            (*max_sizes)[j] = (*max_sizes)[i - 1];
+            (*increments)[j] = (*increments)[i - 1];
+            (*sleeptimes)[j] = (*sleeptimes)[i - 1];
+        }
+    } else {
+        // TODO: throw exception
+    }
 }
