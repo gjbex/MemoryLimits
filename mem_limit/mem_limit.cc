@@ -23,6 +23,7 @@ void fill_memory(char *buffer, size_t size);
 void parse_config(const std::string& file_name, int target_line_nr,
                   int& nr_threads, size_t** max_sizes, size_t** increments,
                   long** sleeptimes);
+void print_help();
 
 int main(int argc, char *argv[]) {
     const int root {0};
@@ -42,6 +43,7 @@ int main(int argc, char *argv[]) {
     long lifetime {0};
     int is_verbose {0};
     int name_length {0};
+    int is_done = 0;
     if (rank == root) {
         bool opt_sufficient {false};
         char opt {'\0'};
@@ -73,7 +75,9 @@ int main(int argc, char *argv[]) {
                         is_verbose = 1;
                         break;
                     case 'h':
-                        // TODO: implement print_help
+                        print_help();
+                        opt_sufficient = 1;
+                        is_done = 1;
                         break;
                     default:
                         std::stringstream msg;
@@ -88,8 +92,8 @@ int main(int argc, char *argv[]) {
                     msg << "# error: invalid option value, " << e.what()
                         << std::endl;
                     std::cerr << msg.str();
-                    // TODO: call print_help
-                    MPI_Abort(MPI_COMM_WORLD, EXIT_OPT_ERROR);
+                    print_help();
+                    is_done = 1;
             }
         }
         if (!opt_sufficient) {
@@ -97,9 +101,14 @@ int main(int argc, char *argv[]) {
             msg << "# error: expecting at least -f or -m option"
                 << std::endl;
             std::cerr << msg.str();
-            // TODO: call print_help
-            MPI_Abort(MPI_COMM_WORLD, EXIT_OPT_ERROR);
+            print_help();
+            is_done = 1;
         }
+    }
+    MPI_Bcast(&is_done, 1, MPI_INT, root, MPI_COMM_WORLD);
+    if (is_done) {
+        MPI_Finalize();
+        return 0;
     }
     MPI_Bcast(&is_verbose, 1, MPI_INT, root, MPI_COMM_WORLD);
     MPI_Bcast(&name_length, 1, MPI_INT, root, MPI_COMM_WORLD);
@@ -319,4 +328,26 @@ void parse_config(const std::string& file_name, int target_line_nr,
     } else {
         // TODO: throw exception
     }
+}
+
+void print_help() {
+    std::stringstream msg;
+    msg << "Usage: mem_limit [-v] [-h] ( "
+        << "-f <conf_file> | \\" << std::endl
+        << "\t\t( -m <size> [-i <size>] [-s <time>] [-t <n>] )) "
+        << "[-l <time>] "
+        << std::endl;
+    msg << "\t-f <conf_file>: configuration file to use" << std::endl;
+    msg << "\t-m <size>: maximum memory size" << std::endl;
+    msg << "\t-i <size>: memory increment per step" << std::endl;
+    msg << "\t-s <time>: time to sleep between steps" << std::endl;
+    msg << "\t-t <n>: number of threads per processs" << std::endl;
+    msg << "\t-l <time>: time to stay alive after last step" << std::endl;
+    msg << "\t-v: give verbose output" << std::endl;
+    msg << "\t-h: show this help message" << std::endl;
+    msg << "<size> takes units b, kb, mb, gb, default is bytes"
+        << std::endl;
+    msg << "<time> takes units m, s, ms, us, default is microseconds"
+        << std::endl;
+    std::cerr << msg.str();
 }
