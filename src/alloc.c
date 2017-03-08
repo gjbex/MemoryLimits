@@ -22,7 +22,7 @@ int main(int argc, char *argv[]) {
         params.incr = params.maxMem;
     for (mem = params.incr; mem <= params.maxMem; mem += params.incr) {
         char *c;
-        if ((c = (char *) calloc(mem, sizeof(char))) == NULL)
+        if ((c = (char *) malloc(mem*sizeof(char))) == NULL)
             errx(EXIT_NO_MEM, "can't allocate %ld bytes", mem);
         printf("%ld bytes allocated succesfully\n", mem);
         fill(c, mem);
