@@ -7,6 +7,7 @@
 #include <thread>
 #include <vector>
 #include <string.h>
+#include <sched.h>
 #include <unistd.h>
 #include <mpi.h>
 #include <omp.h>
@@ -175,9 +176,11 @@ int main(int argc, char *argv[]) {
             increments[thread_nr] : max_sizes[thread_nr];
         for (size_t mem = increment; mem <= max_sizes[thread_nr];
                 mem += increment) {
+            int cpu_nr = sched_getcpu();
             std::stringstream msg;
-            msg << "rank " << rank << "#" << thread_nr << ": "
-                << "allcocating " << mem << " bytes" << std::endl;
+            msg << "rank " << rank << "#" << thread_nr
+                << " on " << cpu_nr << ": "
+                << "allocating " << mem << " bytes" << std::endl;
             std::cout << msg.str();
             try {
                 char *buffer = allocate_memory(mem);
