@@ -185,7 +185,8 @@ int main(int argc, char *argv[]) {
             try {
                 char *buffer = allocate_memory(mem);
                 msg.str("");
-                msg << "rank " << rank << "#" << thread_nr << ": "
+                msg << "rank " << rank << "#" << thread_nr
+                    << " on " << cpu_nr << ": "
                     << "filling " << mem << " bytes" << std::endl;
                 std::cout << msg.str();
                 fill_memory(buffer, mem);
