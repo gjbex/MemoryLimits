@@ -168,6 +168,9 @@ int main(int argc, char *argv[]) {
             << std::endl;
         std::cout << msg.str();
     }
+    char processor_name[MPI_MAX_PROCESSOR_NAME];
+    int processor_name_len;
+    MPI_Get_processor_name(processor_name, &processor_name_len);
     omp_set_num_threads(nr_threads);
 #pragma omp parallel
     {
@@ -179,14 +182,14 @@ int main(int argc, char *argv[]) {
             int cpu_nr = sched_getcpu();
             std::stringstream msg;
             msg << "rank " << rank << "#" << thread_nr
-                << " on " << cpu_nr << ": "
+                << " on " << cpu_nr << "@" << processor_name << ": "
                 << "allocating " << mem << " bytes" << std::endl;
             std::cout << msg.str();
             try {
                 char *buffer = allocate_memory(mem);
                 msg.str("");
                 msg << "rank " << rank << "#" << thread_nr
-                    << " on " << cpu_nr << ": "
+                    << " on " << cpu_nr << "@" << processor_name << ": "
                     << "filling " << mem << " bytes" << std::endl;
                 std::cout << msg.str();
                 fill_memory(buffer, mem);
