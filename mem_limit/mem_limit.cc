@@ -28,7 +28,12 @@ void print_help();
 
 int main(int argc, char *argv[]) {
     const int root {0};
-    MPI_Init(&argc, &argv);
+    int thread_level;
+    MPI_Init_thread(NULL, NULL, MPI_THREAD_FUNNELED, &thread_level);
+    if (thread_level != MPI_THREAD_FUNNELED) {
+        std::cerr << "#error: unexpected thread level" << std::endl;
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
     int rank {0};
     int size {1};
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
