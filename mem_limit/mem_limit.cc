@@ -110,6 +110,10 @@ int main(int argc, char *argv[]) {
             print_help();
             is_done = 1;
         }
+        std::stringstream msg;
+        msg << "Running with " << size << " processes"
+            << std::endl;
+        std::cout << msg.str();
     }
     MPI_Bcast(&is_done, 1, MPI_INT, root, MPI_COMM_WORLD);
     if (is_done) {
@@ -126,7 +130,7 @@ int main(int argc, char *argv[]) {
                   root, MPI_COMM_WORLD);
         if (is_verbose) {
             std::stringstream msg;
-            msg << "rank " << rank << ": "
+            msg << "rank " << rank << ": reading "
                 << "'" << conf_file_name << "'" << std::endl;
             std::cerr << msg.str();
         }
@@ -139,6 +143,20 @@ int main(int argc, char *argv[]) {
                 << std::endl;
             std::cerr << msg.str();
             MPI_Abort(MPI_COMM_WORLD, EXIT_CONFIG_ERROR);
+        }
+        if (is_verbose) {
+            std::stringstream msg;
+            msg << "rank " << rank << " running with " << nr_threads << " threads"
+                << std::endl;
+            for (int thread_nr = 0; thread_nr < nr_threads; thread_nr++) {
+                msg << "rank " << rank << ": "
+                    << "thread " << thread_nr << ", "
+                    << "max. size = " << max_sizes[thread_nr] << ", "
+                    << "increment = " << increments[thread_nr] << ", "
+                    << "sleep time = " << sleeptimes[thread_nr]
+                    << std::endl;
+            }
+            std::cerr << msg.str();
         }
     } else {
         MPI_Bcast(&nr_threads, 1, MPI_INT, root, MPI_COMM_WORLD);
