@@ -49,9 +49,9 @@ than the others.
 1;100mb+50mb+1s
 1;50mb+25mb+1s
 ```
-Each process will have a single thread, the first process will use 100 MB
-of RAM, in incremental steps of 50 MB, all other processes will use only
-50 MB of RAM in 25 MB increments.
+Each process will have a single thread, the first process will use a
+maximum of 100 MB RAM, in incremental steps of 50 MB, all other
+processes will use only a maximum of 50 MB RAM in 25 MB increments.
 
 Note that the number of threads can be specified on a per-process basis,
 and that each thread can have its own memory allocation pattern.
