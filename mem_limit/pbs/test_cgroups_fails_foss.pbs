@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+#PBS -l nodes=2:ppn=2
+#PBS -W x=nmatchpolicy:exactnode
+#PBS -l qos=debugging
+#PBS -l walltime=00:05:00
+#PBS -j oe
+
+cd $PBS_O_WORKDIR
+source switch_to_2016a
+module load foss
+
+export OMP_NUM_THREADS=2
+
+mpirun --np 2 --map-by node:PE=$OMP_NUM_THREADS --bind-to core \
+    ./mem_limit -f conf/cgroups_fails.conf -l 10s
