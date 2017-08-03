@@ -3,6 +3,7 @@
 #PBS -W x=nmatchpolicy:exactnode
 #PBS -l qos=debugging
 #PBS -l walltime=00:05:00
+#PBS -lpmem=300mb
 #PBS -j oe
 
 cd $PBS_O_WORKDIR
