@@ -1,6 +1,7 @@
 # MemoryLimits
 Test memory limits, e.g., the effect of ulimit
 
+
 ## What is it?
 Two applications are provided, `alloc` and `mem_limit`.  Both serve a
 similar purpose, i.e., testing memory limits set by `ulimit` or `cgroups`.
@@ -14,7 +15,9 @@ should build the application, i.e.,
 $ make
 ```
 
+
 ## How to use?
+
 ### `alloc`
 The `alloc` command takes a few options:
 * `-maxMem <bytes>`: maximum number of bytes to be allocated and written
@@ -23,6 +26,7 @@ The `alloc` command takes a few options:
     steps are separated by sleep.
 * `-sleep <seconds>`: seconds to sleep between increments and after final
     step.
+
 
 ### `mem_limit`
 This application can run with a single or multiple processes, each process
@@ -65,3 +69,11 @@ the second 50 MB.  All other processes will have three threads, each using
 
 It is not required to specify the information for all processes and/or
 threads explicitely.
+
+The `check_pinning.py` script will verify that processes/threads don't
+wander around.  If it finds processes or threads that move to other
+cores, those will be reported.  Usage is straightforward, it takes an
+job output file as argument:
+```bash
+$ check_pinning.py test.pbs.o4938484
+```
