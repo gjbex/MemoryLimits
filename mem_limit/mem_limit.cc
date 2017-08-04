@@ -111,7 +111,7 @@ int main(int argc, char *argv[]) {
             is_done = 1;
         }
         std::stringstream msg;
-        msg << "Running with " << size << " processes"
+        msg << "running with " << size << " processes"
             << std::endl;
         std::cout << msg.str();
     }
@@ -236,7 +236,7 @@ int main(int argc, char *argv[]) {
     MPI_Barrier(MPI_COMM_WORLD);
     if (rank == root) {
         std::stringstream msg;
-        msg << "succesfully done" << std::endl;
+        msg << "successfully done" << std::endl;
         std::cout << msg.str();
     }
     MPI_Finalize();

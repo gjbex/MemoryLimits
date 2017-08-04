@@ -14,9 +14,11 @@ with open(file_name, 'r') as data_stream:
         if state == 'prolog':
             if line.startswith('===='):
                 state = 'parsing'
+        elif state == 'parsing' and line.startswith('running'):
+            continue
         elif state == 'parsing' and line.startswith('===='):
             break
-        elif state == 'parsing' and line.startswith('succes'):
+        elif state == 'parsing' and line.startswith('success'):
             break
         else:
             try:
