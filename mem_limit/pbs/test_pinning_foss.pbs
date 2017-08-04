@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+#PBS -l nodes=2:ppn=20
+#PBS -W x=nmatchpolicy:exactnode
+#PBS -l qos=debugging
+#PBS -l walltime=00:05:00
+#PBS -j oe
+
+cd $PBS_O_WORKDIR
+
+if [ $VSC_INSTITUTE_CLUSTER == 'thinking' ]
+then
+    source switch_to_2016a
+fi
+module load foss
+
+export OMP_NUM_THREADS=2
+
+MPI_NUM_PROCS=$(( ${PBS_NP}/${OMP_NUM_THREADS} ))
+
+mpirun --np ${MPI_NUM_PROCS} --map-by node:PE=${OMP_NUM_THREADS} --bind-to core \
+    ./mem_limit -f conf/uniform.conf -l 10s

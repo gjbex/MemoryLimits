@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+#PBS -l nodes=2:ppn=20
+#PBS -W x=nmatchpolicy:exactnode
+#PBS -l qos=debugging
+#PBS -l walltime=00:05:00
+#PBS -j oe
+
+cd $PBS_O_WORKDIR
+
+if [ $VSC_INSTITUTE_CLUSTER == 'thinking' ]
+then
+    source switch_to_2016a
+fi
+module load intel
+
+export OMP_NUM_THREADS=2
+
+MPI_NUM_PROCS=$(( ${PBS_NP}/${OMP_NUM_THREADS} ))
+MPI_PPN=$(( ${PBS_NUM_PPN}/${OMP_NUM_THREADS} ))
+
+export I_MPI_JOB_RESPECT_PROCESS_PLACEMENT=disable
+export OMP_PROC_BIND=true
+
+mpirun --np ${MPI_NUM_PROCS} --ppn ${MPI_PPN} \
+    -genv I_MPI_PIN_DOMAIN=omp:compact \
+    ./mem_limit -f conf/uniform.conf -l 10s
