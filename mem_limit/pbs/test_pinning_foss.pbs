@@ -17,5 +17,7 @@ export OMP_NUM_THREADS=2
 
 MPI_NUM_PROCS=$(( ${PBS_NP}/${OMP_NUM_THREADS} ))
 
-mpirun --np ${MPI_NUM_PROCS} --map-by node:PE=${OMP_NUM_THREADS} --bind-to core \
+mpirun --np ${MPI_NUM_PROCS} \
+       --map-by socket:PE=${OMP_NUM_THREADS} \
+       --bind-to core \
     ./mem_limit -f conf/uniform.conf -l 10s
