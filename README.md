@@ -8,6 +8,14 @@ similar purpose, i.e., testing memory limits set by `ulimit` or `cgroups`.
 `alloc` is a simple serial application, while `mem_limit` is hybrid
 MPI/OpenMP.
 
+
+## Requirements
+`alloc` is a C application, so any reasonable C compiler should work.
+
+`mem_limit` requires a C++14 compatible compiler, and an MPI-2.2 library.
+To run the `check_pinning.py` script, Python 2.7+ is required.
+
+
 ## How to build?
 The provided make file in each of the directories `alloc` and `mem_limit`
 should build the application, i.e.,
@@ -17,7 +25,6 @@ $ make
 
 
 ## How to use?
-
 ### `alloc`
 The `alloc` command takes a few options:
 * `-maxMem <bytes>`: maximum number of bytes to be allocated and written
