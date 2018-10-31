@@ -21,9 +21,11 @@ size_t convert_size(const char *size_spec);
 long convert_time(const char *time_spec);
 char* allocate_memory(size_t size);
 void fill_memory(char *buffer, size_t size);
+void fill_memory_threaded(char *buffer, size_t size);
 void parse_config(const std::string& file_name, int target_line_nr,
-                  int& nr_threads, size_t** max_sizes, size_t** increments,
-                  long** sleeptimes);
+                  size_t& max_size, size_t& increment, long& sleeptime,
+                  int& nr_threads, size_t** max_sizes,
+                  size_t** increments, long** sleeptimes);
 void print_help();
 
 int main(int argc, char *argv[]) {
@@ -39,6 +41,9 @@ int main(int argc, char *argv[]) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     char *conf_file_name {nullptr};
+    size_t proc_max_size {0};
+    size_t proc_increment {0};
+    long  proc_sleeptime {0};
     int nr_threads {1};
     size_t max_size {0};
     size_t *max_sizes {nullptr};
@@ -135,8 +140,10 @@ int main(int argc, char *argv[]) {
             std::cerr << msg.str();
         }
         try {
-            parse_config(conf_file_name, rank, nr_threads, &max_sizes,
-                         &increments, &sleeptimes);
+            parse_config(conf_file_name, rank,
+                         proc_max_size, proc_increment, proc_sleeptime,
+                         nr_threads,
+                         &max_sizes, &increments, &sleeptimes);
         } catch (const std::exception& e) {
             std::stringstream msg;
             msg << "# error: invalid configuration file, " << e.what()
@@ -195,6 +202,35 @@ int main(int argc, char *argv[]) {
     int processor_name_len;
     MPI_Get_processor_name(processor_name, &processor_name_len);
     omp_set_num_threads(nr_threads);
+    size_t mem_incr = proc_increment > 0 ?
+        proc_increment : proc_max_size;
+    for (size_t mem = mem_incr; mem <= proc_max_size; mem += mem_incr) {
+        int cpu_nr = sched_getcpu();
+        std::stringstream msg;
+        msg << "rank " << rank
+            << " on " << cpu_nr << "@" << processor_name << ": "
+            << "allocating " << mem << " bytes" << std::endl;
+        std::cout << msg.str();
+        try {
+            char *buffer = allocate_memory(mem);
+            msg.str("");
+            msg << "rank " << rank
+                << " on " << cpu_nr << "@" << processor_name << ": "
+                << "filling " << mem << " bytes" << std::endl;
+            std::cout << msg.str();
+#pragma omp parallel shared(buffer, mem)
+            fill_memory_threaded(buffer, mem);
+            std::chrono::microseconds period(proc_sleeptime);
+            std::this_thread::sleep_for(period);
+            delete[] buffer;
+        } catch (const std::runtime_error& e) {
+            std::stringstream msg;
+            msg << "# error: allocation of " << mem << " bytes failed"
+                << std::endl;
+            std::cerr << msg.str();
+            MPI_Abort(MPI_COMM_WORLD, EXIT_MEM_ERROR);
+        }
+    }
 #pragma omp parallel
     {
         int thread_nr = omp_get_thread_num();
@@ -302,6 +338,15 @@ void fill_memory(char *buffer, size_t size) {
     }
 }
 
+void fill_memory_threaded(char *buffer, size_t size) {
+    char fill = 'A';
+#pragma omp for
+    for (size_t i = 0; i < size; i++) {
+        buffer[i] = fill;
+        fill = fill == 'Z' ? 'A' : fill + 1;
+    }
+}
+
 std::vector<std::string> split(const std::string& str,
                                const std::string& delim) {
     std::vector<std::string> parts;
@@ -315,8 +360,9 @@ std::vector<std::string> split(const std::string& str,
 }
 
 void parse_config(const std::string& file_name, int target_line_nr,
-                  int& nr_threads, size_t** max_sizes, size_t** increments,
-                  long** sleeptimes) {
+                  size_t& max_size, size_t& increment, long& sleeptime,
+                  int& nr_threads, size_t** max_sizes,
+                  size_t** increments, long** sleeptimes) {
     std::regex comment_re {R"(^\s*#)"};
     std::regex empty_re {R"(^\s*$)"};
     std::ifstream config_file;
@@ -338,11 +384,23 @@ void parse_config(const std::string& file_name, int target_line_nr,
     config_file.close();
     if (line.length() > 0) {
         std::vector<std::string> parts = split(line, ";");
-        nr_threads = std::stoi(parts.at(0));
+        if (parts.size() == 2) {
+            max_size = 0;
+            increment = 0;
+            sleeptime = 0;
+            nr_threads = std::stoi(parts.at(0));
+            parts = split(parts.at(1), ":");
+        } else if (parts.size() == 3) {
+            std::vector<std::string> specs = split(parts.at(0), "+");
+            max_size = convert_size(specs.at(0).c_str());
+            increment = convert_size(specs.at(1).c_str());
+            sleeptime = convert_time(specs.at(2).c_str());
+            nr_threads = std::stoi(parts.at(1));
+            parts = split(parts.at(2), ":");
+        }
         *max_sizes = new size_t[nr_threads];
         *increments = new size_t[nr_threads];
         *sleeptimes = new long[nr_threads];
-        parts = split(parts.at(1), ":");
         size_t i {0};
         for (i = 0; i < parts.size() && ((int) i) < nr_threads; i++) {
             std::vector<std::string> specs = split(parts.at(i), "+");
