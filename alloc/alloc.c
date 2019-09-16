@@ -25,8 +25,10 @@ int main(int argc, char *argv[]) {
         if ((c = (char *) malloc(mem*sizeof(char))) == NULL)
             errx(EXIT_NO_MEM, "can't allocate %ld bytes", mem);
         printf("%ld bytes allocated succesfully\n", mem);
+        fflush(stdout);
         fill(c, mem);
         printf("%ld bytes written succesfully\n", mem);
+        fflush(stdout);
         sleep(params.sleep);
         free(c);
     }
@@ -37,5 +39,5 @@ int main(int argc, char *argv[]) {
 void fill(char *c, long size) {
     long i;
     for (i = 0; i < size; i++)
-        c[i] = 'A' + rand() % 26;
+        c[i] = 'A' + (i % 26);
 }
