@@ -36,6 +36,10 @@ The `alloc` command takes a few options:
 
 
 ### `mem_limit`
+
+This application can be built as hybrid MPI+OpenMP, MPI only, OpenMP only
+or sequential.
+
 This application can run with a single or multiple processes, each process
 can have one or more threads. Command line options allow for the
 configuaration of a homogeneous run, i.e., all processes and threads will
