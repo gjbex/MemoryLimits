@@ -106,10 +106,11 @@ int main(int argc, char *argv[]) {
                         msg << "# error: unknown option '-" << opt << "'"
                             << std::endl;
                         std::cerr << msg.str();
-                        // TODO: call print_help
+                        print_help();
 #ifndef NO_MPI
                         MPI_Abort(MPI_COMM_WORLD, EXIT_OPT_ERROR);
 #endif
+                        std::exit(EXIT_OPT_ERROR);
                 }
             } catch (const std::invalid_argument& e) {
                     std::stringstream msg;
@@ -173,7 +174,7 @@ int main(int argc, char *argv[]) {
 #ifndef NO_MPI
             MPI_Abort(MPI_COMM_WORLD, EXIT_CONFIG_ERROR);
 #endif
-            return EXIT_CONFIG_ERROR;
+            std::exit(EXIT_CONFIG_ERROR);
         }
         if (is_verbose) {
             std::stringstream msg;
@@ -206,6 +207,8 @@ int main(int argc, char *argv[]) {
                 << "sleep time = " << sleeptime << std::endl;
             std::cerr << msg.str();
         }
+        proc_increment = increment;
+        proc_max_size = max_size;
         max_sizes = new size_t[nr_threads];
         increments = new size_t[nr_threads];
         sleeptimes = new long[nr_threads];
@@ -221,7 +224,7 @@ int main(int argc, char *argv[]) {
 #endif
     if (max_threads < nr_threads) {
         std::stringstream msg;
-        msg << "# warming rank " << rank << ": "
+        msg << "# warning rank " << rank << ": "
             << "nr. threads " << nr_threads
             << " exceeds max. threads " << max_threads
             << std::endl;
@@ -241,8 +244,7 @@ int main(int argc, char *argv[]) {
 #ifdef _OPENMP
     omp_set_num_threads(nr_threads);
 #endif
-    size_t mem_incr = proc_increment > 0 ?
-        proc_increment : proc_max_size;
+    size_t mem_incr = proc_increment > 0 ?  proc_increment : proc_max_size;
     for (size_t mem = mem_incr; mem <= proc_max_size; mem += mem_incr) {
         int cpu_nr = sched_getcpu();
         std::stringstream msg;
