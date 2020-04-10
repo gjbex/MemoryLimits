@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+#PBS -A lpt1_sysadmin
+#PBS -L tasks=4:lprocs=2:place=core=2:memory=4200mb
+#PBS -l walltime=00:05:00
+
+module load foss/2018a
+cd $PBS_O_WORKDIR
+
+mpirun ./mem_limit -f conf/hybrid.conf

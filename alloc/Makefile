@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -O0 -g -Wall
+CFLAGS = -O3 -g -Wall
 GENCL = weave
 
 OBJS = cl_params_aux.o cl_params.o alloc.o

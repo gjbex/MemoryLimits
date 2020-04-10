@@ -9,36 +9,52 @@
 #include <string.h>
 #include <sched.h>
 #include <unistd.h>
+#ifndef NO_MPI
 #include <mpi.h>
+#endif
+#ifdef _OPENMP
 #include <omp.h>
+#endif
 
 // exit codes for application
 const int EXIT_OPT_ERROR {1};
 const int EXIT_CONFIG_ERROR {2};
 const int EXIT_MEM_ERROR {3};
 
+// maximum length for a hostname
+const int MAX_PROCESSOR_NAME {1024};
+
 size_t convert_size(const char *size_spec);
 long convert_time(const char *time_spec);
 char* allocate_memory(size_t size);
 void fill_memory(char *buffer, size_t size);
+void fill_memory_threaded(char *buffer, size_t size);
 void parse_config(const std::string& file_name, int target_line_nr,
-                  int& nr_threads, size_t** max_sizes, size_t** increments,
-                  long** sleeptimes);
+                  size_t& max_size, size_t& increment, long& sleeptime,
+                  int& nr_threads, size_t** max_sizes,
+                  size_t** increments, long** sleeptimes);
 void print_help();
 
 int main(int argc, char *argv[]) {
     const int root {0};
+#ifndef NO_MPI
     int thread_level;
     MPI_Init_thread(NULL, NULL, MPI_THREAD_FUNNELED, &thread_level);
     if (thread_level != MPI_THREAD_FUNNELED) {
         std::cerr << "#error: unexpected thread level" << std::endl;
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
+#endif
     int rank {0};
     int size {1};
+#ifndef NO_MPI
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
+#endif
     char *conf_file_name {nullptr};
+    size_t proc_max_size {0};
+    size_t proc_increment {0};
+    long  proc_sleeptime {0};
     int nr_threads {1};
     size_t max_size {0};
     size_t *max_sizes {nullptr};
@@ -90,8 +106,11 @@ int main(int argc, char *argv[]) {
                         msg << "# error: unknown option '-" << opt << "'"
                             << std::endl;
                         std::cerr << msg.str();
-                        // TODO: call print_help
+                        print_help();
+#ifndef NO_MPI
                         MPI_Abort(MPI_COMM_WORLD, EXIT_OPT_ERROR);
+#endif
+                        std::exit(EXIT_OPT_ERROR);
                 }
             } catch (const std::invalid_argument& e) {
                     std::stringstream msg;
@@ -115,19 +134,27 @@ int main(int argc, char *argv[]) {
             << std::endl;
         std::cout << msg.str();
     }
+#ifndef NO_MPI
     MPI_Bcast(&is_done, 1, MPI_INT, root, MPI_COMM_WORLD);
+#endif
     if (is_done) {
+#ifndef NO_MPI
         MPI_Finalize();
+#endif
         return 0;
     }
+#ifndef NO_MPI
     MPI_Bcast(&is_verbose, 1, MPI_INT, root, MPI_COMM_WORLD);
     MPI_Bcast(&name_length, 1, MPI_INT, root, MPI_COMM_WORLD);
+#endif
     if (name_length > 0) {
         if (rank != root) {
             conf_file_name = new char[name_length + 1];
         }
+#ifndef NO_MPI
         MPI_Bcast(conf_file_name, name_length + 1, MPI_CHAR,
                   root, MPI_COMM_WORLD);
+#endif
         if (is_verbose) {
             std::stringstream msg;
             msg << "rank " << rank << ": reading "
@@ -135,14 +162,19 @@ int main(int argc, char *argv[]) {
             std::cerr << msg.str();
         }
         try {
-            parse_config(conf_file_name, rank, nr_threads, &max_sizes,
-                         &increments, &sleeptimes);
+            parse_config(conf_file_name, rank,
+                         proc_max_size, proc_increment, proc_sleeptime,
+                         nr_threads,
+                         &max_sizes, &increments, &sleeptimes);
         } catch (const std::exception& e) {
             std::stringstream msg;
             msg << "# error: invalid configuration file, " << e.what()
                 << std::endl;
             std::cerr << msg.str();
+#ifndef NO_MPI
             MPI_Abort(MPI_COMM_WORLD, EXIT_CONFIG_ERROR);
+#endif
+            std::exit(EXIT_CONFIG_ERROR);
         }
         if (is_verbose) {
             std::stringstream msg;
@@ -159,11 +191,13 @@ int main(int argc, char *argv[]) {
             std::cerr << msg.str();
         }
     } else {
+#ifndef NO_MPI
         MPI_Bcast(&nr_threads, 1, MPI_INT, root, MPI_COMM_WORLD);
         MPI_Bcast(&max_size, 1, MPI_UNSIGNED_LONG, root, MPI_COMM_WORLD);
         MPI_Bcast(&increment, 1, MPI_UNSIGNED_LONG, root, MPI_COMM_WORLD);
         MPI_Bcast(&sleeptime, 1, MPI_LONG, root, MPI_COMM_WORLD);
         MPI_Bcast(&lifetime, 1, MPI_LONG, root, MPI_COMM_WORLD);
+#endif
         if (is_verbose) {
             std::stringstream msg;
             msg << "rank " << rank << ": "
@@ -173,6 +207,8 @@ int main(int argc, char *argv[]) {
                 << "sleep time = " << sleeptime << std::endl;
             std::cerr << msg.str();
         }
+        proc_increment = increment;
+        proc_max_size = max_size;
         max_sizes = new size_t[nr_threads];
         increments = new size_t[nr_threads];
         sleeptimes = new long[nr_threads];
@@ -182,22 +218,69 @@ int main(int argc, char *argv[]) {
             sleeptimes[i] = sleeptime;
         }
     }
-    int max_threads =  omp_get_max_threads();
+    int max_threads {1};
+#ifdef _OPENMP
+    max_threads = omp_get_max_threads();
+#endif
     if (max_threads < nr_threads) {
         std::stringstream msg;
-        msg << "# warming rank " << rank << ": "
+        msg << "# warning rank " << rank << ": "
             << "nr. threads " << nr_threads
             << " exceeds max. threads " << max_threads
             << std::endl;
         std::cout << msg.str();
     }
-    char processor_name[MPI_MAX_PROCESSOR_NAME];
+    int max_processor_length = MAX_PROCESSOR_NAME;
+#ifndef NO_MPI
+    max_processor_length = MPI_MAX_PROCESSOR_NAME;
+#endif
+    char processor_name[max_processor_length];
+#ifndef NO_MPI
     int processor_name_len;
     MPI_Get_processor_name(processor_name, &processor_name_len);
+#else
+    gethostname(processor_name, max_processor_length);
+#endif
+#ifdef _OPENMP
     omp_set_num_threads(nr_threads);
+#endif
+    size_t mem_incr = proc_increment > 0 ?  proc_increment : proc_max_size;
+    for (size_t mem = mem_incr; mem <= proc_max_size; mem += mem_incr) {
+        int cpu_nr = sched_getcpu();
+        std::stringstream msg;
+        msg << "rank " << rank
+            << " on " << cpu_nr << "@" << processor_name << ": "
+            << "allocating " << mem << " bytes" << std::endl;
+        std::cout << msg.str();
+        try {
+            char *buffer = allocate_memory(mem);
+            msg.str("");
+            msg << "rank " << rank
+                << " on " << cpu_nr << "@" << processor_name << ": "
+                << "filling " << mem << " bytes" << std::endl;
+            std::cout << msg.str();
+#pragma omp parallel shared(buffer, mem)
+            fill_memory_threaded(buffer, mem);
+            std::chrono::microseconds period(proc_sleeptime);
+            std::this_thread::sleep_for(period);
+            delete[] buffer;
+        } catch (const std::runtime_error& e) {
+            std::stringstream msg;
+            msg << "# error: allocation of " << mem << " bytes failed"
+                << std::endl;
+            std::cerr << msg.str();
+#ifndef NO_MPI
+            MPI_Abort(MPI_COMM_WORLD, EXIT_MEM_ERROR);
+#endif
+            std::exit(EXIT_MEM_ERROR);
+        }
+    }
 #pragma omp parallel
     {
-        int thread_nr = omp_get_thread_num();
+        int thread_nr {0};
+#ifdef _OPENMP
+        thread_nr = omp_get_thread_num();
+#endif
         size_t increment = increments[thread_nr] > 0 ?
             increments[thread_nr] : max_sizes[thread_nr];
         for (size_t mem = increment; mem <= max_sizes[thread_nr];
@@ -224,7 +307,10 @@ int main(int argc, char *argv[]) {
                 msg << "# error: allocation of " << mem << " bytes failed"
                     << std::endl;
                 std::cerr << msg.str();
+#ifndef NO_MPI
                 MPI_Abort(MPI_COMM_WORLD, EXIT_MEM_ERROR);
+#endif
+                std::exit(EXIT_MEM_ERROR);
             }
         }
     }
@@ -233,13 +319,17 @@ int main(int argc, char *argv[]) {
     delete[] max_sizes;
     delete[] increments;
     delete[] sleeptimes;
+#ifndef NO_MPI
     MPI_Barrier(MPI_COMM_WORLD);
+#endif
     if (rank == root) {
         std::stringstream msg;
         msg << "successfully done" << std::endl;
         std::cout << msg.str();
     }
+#ifndef NO_MPI
     MPI_Finalize();
+#endif
     return 0;
 }
 
@@ -302,6 +392,15 @@ void fill_memory(char *buffer, size_t size) {
     }
 }
 
+void fill_memory_threaded(char *buffer, size_t size) {
+    char fill = 'A';
+#pragma omp for
+    for (size_t i = 0; i < size; i++) {
+        buffer[i] = fill;
+        fill = fill == 'Z' ? 'A' : fill + 1;
+    }
+}
+
 std::vector<std::string> split(const std::string& str,
                                const std::string& delim) {
     std::vector<std::string> parts;
@@ -315,8 +414,9 @@ std::vector<std::string> split(const std::string& str,
 }
 
 void parse_config(const std::string& file_name, int target_line_nr,
-                  int& nr_threads, size_t** max_sizes, size_t** increments,
-                  long** sleeptimes) {
+                  size_t& max_size, size_t& increment, long& sleeptime,
+                  int& nr_threads, size_t** max_sizes,
+                  size_t** increments, long** sleeptimes) {
     std::regex comment_re {R"(^\s*#)"};
     std::regex empty_re {R"(^\s*$)"};
     std::ifstream config_file;
@@ -338,11 +438,23 @@ void parse_config(const std::string& file_name, int target_line_nr,
     config_file.close();
     if (line.length() > 0) {
         std::vector<std::string> parts = split(line, ";");
-        nr_threads = std::stoi(parts.at(0));
+        if (parts.size() == 2) {
+            max_size = 0;
+            increment = 0;
+            sleeptime = 0;
+            nr_threads = std::stoi(parts.at(0));
+            parts = split(parts.at(1), ":");
+        } else if (parts.size() == 3) {
+            std::vector<std::string> specs = split(parts.at(0), "+");
+            max_size = convert_size(specs.at(0).c_str());
+            increment = convert_size(specs.at(1).c_str());
+            sleeptime = convert_time(specs.at(2).c_str());
+            nr_threads = std::stoi(parts.at(1));
+            parts = split(parts.at(2), ":");
+        }
         *max_sizes = new size_t[nr_threads];
         *increments = new size_t[nr_threads];
         *sleeptimes = new long[nr_threads];
-        parts = split(parts.at(1), ":");
         size_t i {0};
         for (i = 0; i < parts.size() && ((int) i) < nr_threads; i++) {
             std::vector<std::string> specs = split(parts.at(i), "+");
