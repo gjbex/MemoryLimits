@@ -244,37 +244,7 @@ int main(int argc, char *argv[]) {
 #ifdef _OPENMP
     omp_set_num_threads(nr_threads);
 #endif
-    size_t mem_incr = proc_increment > 0 ?  proc_increment : proc_max_size;
-    for (size_t mem = mem_incr; mem <= proc_max_size; mem += mem_incr) {
-        int cpu_nr = sched_getcpu();
-        std::stringstream msg;
-        msg << "rank " << rank
-            << " on " << cpu_nr << "@" << processor_name << ": "
-            << "allocating " << mem << " bytes" << std::endl;
-        std::cout << msg.str();
-        try {
-            char *buffer = allocate_memory(mem);
-            msg.str("");
-            msg << "rank " << rank
-                << " on " << cpu_nr << "@" << processor_name << ": "
-                << "filling " << mem << " bytes" << std::endl;
-            std::cout << msg.str();
-#pragma omp parallel shared(buffer, mem)
-            fill_memory_threaded(buffer, mem);
-            std::chrono::microseconds period(proc_sleeptime);
-            std::this_thread::sleep_for(period);
-            delete[] buffer;
-        } catch (const std::runtime_error& e) {
-            std::stringstream msg;
-            msg << "# error: allocation of " << mem << " bytes failed"
-                << std::endl;
-            std::cerr << msg.str();
-#ifndef NO_MPI
-            MPI_Abort(MPI_COMM_WORLD, EXIT_MEM_ERROR);
-#endif
-            std::exit(EXIT_MEM_ERROR);
-        }
-    }
+
 #pragma omp parallel
     {
         int thread_nr {0};
