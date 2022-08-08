@@ -134,7 +134,7 @@ int main(int argc, char *argv[]) {
             is_done = 1;
         }
         std::stringstream msg;
-        msg << "running with " << size << " processes"
+        msg << get_now() << ": running with " << size << " processes"
             << std::endl;
         std::cout << msg.str();
     }
@@ -300,7 +300,7 @@ int main(int argc, char *argv[]) {
 #endif
     if (rank == root) {
         std::stringstream msg;
-        msg << "successfully done" << std::endl;
+        msg << get_now() << ": successfully done" << std::endl;
         std::cout << msg.str();
     }
 #ifndef NO_MPI
