@@ -1,6 +1,8 @@
 #include <algorithm>
 #include <chrono>
+#include <ctime>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <regex>
 #include <sstream>
@@ -8,6 +10,7 @@
 #include <vector>
 #include <string.h>
 #include <sched.h>
+#include <sstream>
 #include <unistd.h>
 #ifndef NO_MPI
 #include <mpi.h>
@@ -34,6 +37,7 @@ void parse_config(const std::string& file_name, int target_line_nr,
                   int& nr_threads, size_t** max_sizes,
                   size_t** increments, long** sleeptimes);
 void print_help();
+std::string get_now();
 
 int main(int argc, char *argv[]) {
     const int root {0};
@@ -257,14 +261,16 @@ int main(int argc, char *argv[]) {
                 mem += increment) {
             int cpu_nr = sched_getcpu();
             std::stringstream msg;
-            msg << "rank " << rank << "#" << thread_nr
+            msg << get_now() << ": "
+                << "rank " << rank << "#" << thread_nr
                 << " on " << cpu_nr << "@" << processor_name << ": "
                 << "allocating " << mem << " bytes" << std::endl;
             std::cout << msg.str();
             try {
                 char *buffer = allocate_memory(mem);
                 msg.str("");
-                msg << "rank " << rank << "#" << thread_nr
+                msg << get_now() << ": "
+                    << "rank " << rank << "#" << thread_nr
                     << " on " << cpu_nr << "@" << processor_name << ": "
                     << "filling " << mem << " bytes" << std::endl;
                 std::cout << msg.str();
@@ -462,4 +468,16 @@ void print_help() {
     msg << "<time> takes units m, s, ms, us, default is microseconds"
         << std::endl;
     std::cerr << msg.str();
+}
+
+std::string get_now() {
+    auto time {std::chrono::system_clock::now()};
+    auto duration = time.time_since_epoch();
+    auto microseconds = std::chrono::duration_cast<std::chrono::microseconds>(duration).count() % 1'000'000;
+    auto time_c {std::chrono::system_clock::to_time_t(time)};
+    auto tm {std::localtime(&time_c)};
+    std::stringstream str;
+    str << std::put_time(tm, "%Y-%m-%d %H:%M:%S")
+        << "." << std::setfill('0') << std::setw(6) << microseconds;
+    return str.str();
 }
