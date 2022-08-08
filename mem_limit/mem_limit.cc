@@ -134,8 +134,8 @@ int main(int argc, char *argv[]) {
             is_done = 1;
         }
         std::stringstream msg;
-        msg << "running with " << size << " processes"
-            << std::endl;
+        msg << get_now() << ": running with " << size << " processes"
+            << "\n";
         std::cout << msg.str();
     }
 #ifndef NO_MPI
@@ -264,7 +264,7 @@ int main(int argc, char *argv[]) {
             msg << get_now() << ": "
                 << "rank " << rank << "#" << thread_nr
                 << " on " << cpu_nr << "@" << processor_name << ": "
-                << "allocating " << mem << " bytes" << std::endl;
+                << "allocating " << mem << " bytes" << "\n";
             std::cout << msg.str();
             try {
                 char *buffer = allocate_memory(mem);
@@ -272,7 +272,7 @@ int main(int argc, char *argv[]) {
                 msg << get_now() << ": "
                     << "rank " << rank << "#" << thread_nr
                     << " on " << cpu_nr << "@" << processor_name << ": "
-                    << "filling " << mem << " bytes" << std::endl;
+                    << "filling " << mem << " bytes" << "\n";
                 std::cout << msg.str();
                 fill_memory(buffer, mem);
                 std::chrono::microseconds period(sleeptimes[thread_nr]);
@@ -300,7 +300,7 @@ int main(int argc, char *argv[]) {
 #endif
     if (rank == root) {
         std::stringstream msg;
-        msg << "successfully done" << std::endl;
+        msg << get_now() << ": successfully done" << "\n";
         std::cout << msg.str();
     }
 #ifndef NO_MPI
