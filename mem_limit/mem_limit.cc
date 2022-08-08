@@ -228,7 +228,7 @@ int main(int argc, char *argv[]) {
             << "nr. threads " << nr_threads
             << " exceeds max. threads " << max_threads
             << std::endl;
-        std::cout << msg.str();
+        std::cerr << msg.str();
     }
     int max_processor_length = MAX_PROCESSOR_NAME;
 #ifndef NO_MPI
