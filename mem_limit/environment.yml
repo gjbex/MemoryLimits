@@ -1,0 +1,10 @@
+name: mem_limit
+channels:
+  - defaults
+dependencies:
+  - pandas
+  - jupyterlab
+  - ca-certificates
+  - certifi
+  - openssl
+prefix: /home/gjb/miniconda3/envs/mem_limit
