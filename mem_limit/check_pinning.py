@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 from argparse import ArgumentParser
+from collections import defaultdict
 import sys
 
 
@@ -12,15 +13,21 @@ if __name__ == '__main__':
     arg_parser = ArgumentParser(description='parse memlimit output to '
                                             'detect threads that '
                                             'wandered around')
-    arg_parser.add_argument('file', help='PBS output file to parse')
+    arg_parser.add_argument('file', help='output file to parse')
+    arg_parser.add_argument('--pbs', action='store_true',
+                            help='output is part of PBS job output')
     arg_parser.add_argument('--verbose', action='store_true',
                             help='generate verbose output')
     options = arg_parser.parse_args()
     with open(options.file, 'r') as data_stream:
         thread_placement = dict()
+        thread_locations = defaultdict(set)
         moving_threads = set()
         nr_moves = 0
-        state = 'prolog'
+        if options.pbs:
+            state = 'prolog'
+        else:
+            state = 'parsing'
         for line in data_stream:
             if state == 'prolog':
                 if line.startswith('===='):
@@ -29,13 +36,16 @@ if __name__ == '__main__':
                 continue
             elif state == 'parsing' and line.startswith('===='):
                 break
-            elif state == 'parsing' and line.startswith('success'):
+            elif state == 'parsing' and 'success' in line:
                 break
+            elif state == 'parsing' and 'running' in line:
+                continue
             else:
                 try:
                     data = line.strip().split()
-                    thread = data[1]
-                    core = data[3]
+                    thread = data[3]
+                    core = data[5].strip(':')
+                    thread_locations[thread].add(core)
                     if thread in thread_placement:
                         if core != thread_placement[thread]:
                             moving_threads.add(thread)
@@ -51,11 +61,11 @@ if __name__ == '__main__':
                     msg = "### error: {0} on line\n\t'{1}'"
                     sys.stderr.write(msg.format(str(e), line))
                     sys.exit(2)
-        if moving_threads:
+        if moving_threads or options.verbose:
             msg = 'Summary: {0:d}/{1:d} threads moved, {2:d} total moves'
             print(msg.format(len(moving_threads), len(thread_placement),
                              nr_moves))
             if options.verbose:
-                moving_threads = sorted(list(moving_threads),
-                                        key=process_key)
-                print('\t{0}'.format('\n\t'.join(moving_threads)))
+                print('placement:')
+                for thread, locations in thread_locations.items():
+                    print('{thread:10s}: {core:s}'.format(thread=thread, core=','.join(locations)))
