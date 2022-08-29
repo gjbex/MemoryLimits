@@ -1,3 +1,4 @@
 mem_limit
 mem_limit_no_mpi
 TestRuns
+.ipynb_checkpoints/
