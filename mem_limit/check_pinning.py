@@ -17,7 +17,7 @@ if __name__ == '__main__':
                             help='generate verbose output')
     options = arg_parser.parse_args()
     with open(options.file, 'r') as data_stream:
-        thread_placement = dict()
+        thread_placement = {}
         moving_threads = set()
         nr_moves = 0
         state = 'prolog'
