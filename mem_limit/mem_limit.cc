@@ -130,10 +130,12 @@ int main(int argc, char *argv[]) {
             print_help();
             is_done = 1;
         }
-        std::stringstream msg;
-        msg << "running with " << size << " processes"
-            << std::endl;
-        std::cout << msg.str();
+        if (!is_done) {
+            std::stringstream msg;
+            msg << "running with " << size << " processes"
+                << std::endl;
+            std::cout << msg.str();
+        }
     }
 #ifndef NO_MPI
     MPI_Bcast(&is_done, 1, MPI_INT, root, MPI_COMM_WORLD);
