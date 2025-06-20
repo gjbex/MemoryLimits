@@ -52,6 +52,7 @@ int main(int argc, char *argv[]) {
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 #endif
     char *conf_file_name {nullptr};
+    bool conf_file_allocated {false};
     size_t proc_max_size {0};
     size_t proc_increment {0};
     long  proc_sleeptime {0};
@@ -150,6 +151,7 @@ int main(int argc, char *argv[]) {
     if (name_length > 0) {
         if (rank != root) {
             conf_file_name = new char[name_length + 1];
+            conf_file_allocated = true;
         }
 #ifndef NO_MPI
         MPI_Bcast(conf_file_name, name_length + 1, MPI_CHAR,
@@ -292,6 +294,9 @@ int main(int argc, char *argv[]) {
 #ifndef NO_MPI
     MPI_Barrier(MPI_COMM_WORLD);
 #endif
+    if (conf_file_allocated && conf_file_name != nullptr) {
+        delete[] conf_file_name;
+    }
     if (rank == root) {
         std::stringstream msg;
         msg << "successfully done" << std::endl;
