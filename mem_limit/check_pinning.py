@@ -34,6 +34,9 @@ if __name__ == '__main__':
             else:
                 try:
                     data = line.strip().split()
+                    if len(data) < 4:
+                        raise ValueError('expected at least 4 fields, got {0}'
+                                         .format(len(data)))
                     thread = data[1]
                     core = data[3]
                     if thread in thread_placement:
@@ -48,9 +51,9 @@ if __name__ == '__main__':
                     else:
                         thread_placement[thread] = core
                 except Exception as e:
-                    msg = "### error: {0} on line\n\t'{1}'"
-                    sys.stderr.write(msg.format(str(e), line))
-                    sys.exit(2)
+                    msg = "### warning: {0} on line\n\t'{1}'\n"
+                    sys.stderr.write(msg.format(str(e), line.strip()))
+                    continue
         if moving_threads:
             msg = 'Summary: {0:d}/{1:d} threads moved, {2:d} total moves'
             print(msg.format(len(moving_threads), len(thread_placement),
