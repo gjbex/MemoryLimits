@@ -37,3 +37,11 @@
 
 # vim backup files
 *~
+
+# Compiled binaries
+/mem_limit/mem_limit
+/mem_limit/mem_limit_no_mpi
+/alloc/alloc
+
+# Python cache directories
+__pycache__/
