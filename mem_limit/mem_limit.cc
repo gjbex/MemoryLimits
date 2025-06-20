@@ -168,6 +168,14 @@ int main(int argc, char *argv[]) {
                          proc_max_size, proc_increment, proc_sleeptime,
                          nr_threads,
                          &max_sizes, &increments, &sleeptimes);
+        } catch (const std::runtime_error& e) {
+            std::stringstream msg;
+            msg << "# error: " << e.what() << std::endl;
+            std::cerr << msg.str();
+#ifndef NO_MPI
+            MPI_Abort(MPI_COMM_WORLD, EXIT_CONFIG_ERROR);
+#endif
+            std::exit(EXIT_CONFIG_ERROR);
         } catch (const std::exception& e) {
             std::stringstream msg;
             msg << "# error: invalid configuration file, " << e.what()
@@ -399,6 +407,11 @@ void parse_config(const std::string& file_name, int target_line_nr,
     std::regex empty_re {R"(^\s*$)"};
     std::ifstream config_file;
     config_file.open(file_name);
+    if (!config_file.is_open()) {
+        std::stringstream ss;
+        ss << "unable to open configuration file '" << file_name << "'";
+        throw std::runtime_error(ss.str());
+    }
     int line_nr {0};
     std::string line;
     while (config_file) {
@@ -414,6 +427,12 @@ void parse_config(const std::string& file_name, int target_line_nr,
             break;
     }
     config_file.close();
+    if (line_nr <= target_line_nr) {
+        std::stringstream ss;
+        ss << "requested line " << target_line_nr
+           << " not found in configuration file '" << file_name << "'";
+        throw std::runtime_error(ss.str());
+    }
     if (line.length() > 0) {
         std::vector<std::string> parts = split(line, ";");
         if (parts.size() == 2) {
@@ -446,7 +465,10 @@ void parse_config(const std::string& file_name, int target_line_nr,
             (*sleeptimes)[j] = (*sleeptimes)[i - 1];
         }
     } else {
-        // TODO: throw exception
+        std::stringstream ss;
+        ss << "unable to parse configuration line " << target_line_nr
+           << " in '" << file_name << "'";
+        throw std::runtime_error(ss.str());
     }
 }
 
