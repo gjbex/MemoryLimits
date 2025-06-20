@@ -453,7 +453,7 @@ void print_help() {
     msg << "\t-m <size>: maximum memory size" << std::endl;
     msg << "\t-i <size>: memory increment per step" << std::endl;
     msg << "\t-s <time>: time to sleep between steps" << std::endl;
-    msg << "\t-t <n>: number of threads per processs" << std::endl;
+    msg << "\t-t <n>: number of threads per process" << std::endl;
     msg << "\t-l <time>: time to stay alive after last step" << std::endl;
     msg << "\t-v: give verbose output" << std::endl;
     msg << "\t-h: show this help message" << std::endl;
@@ -462,4 +462,5 @@ void print_help() {
     msg << "<time> takes units m, s, ms, us, default is microseconds"
         << std::endl;
     std::cerr << msg.str();
+    std::cerr << std::endl;
 }
