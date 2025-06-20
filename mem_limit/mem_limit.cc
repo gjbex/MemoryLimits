@@ -348,9 +348,12 @@ long convert_time(const char *time_spec) {
 }
 
 char* allocate_memory(size_t size) {
-    char* buffer {NULL};
-    if ((buffer = (char*) malloc(size*sizeof(char))) == NULL)
-        throw std::runtime_error("can allocate memory");
+    char* buffer {nullptr};
+    if ((buffer = static_cast<char*>(malloc(size * sizeof(char)))) == nullptr) {
+        std::stringstream ss;
+        ss << "can't allocate memory (" << size << " bytes)";
+        throw std::runtime_error(ss.str());
+    }
     return buffer;
 }
 
